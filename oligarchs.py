@@ -50,7 +50,7 @@ class Oligarch:
     def resolve_decision(self, choice):
         if choice == "Bribe Government Official (-20k RUB)":
             if self.money < 20_000:
-                print("You don't have enough money to bribe anyone.")
+                print("You don't have enough money to bribe a government official. Only U.S. Senators can be bought for that price.")
                 return
             self.money -= 20_000
             success_chance = 35 if self.role != "KGB Agent" else 90
@@ -69,6 +69,9 @@ class Oligarch:
             if self.money < 500_000:
                 print("You don't have enough money to invest in a shell company.")
                 return
+            if self.inventory.get("Shell Company"):
+                print("You already have a shell company.")
+                return
             self.inventory["Shell Company"] = True
             self.money -= 500_000
             self.passive_income += 10_000
@@ -78,6 +81,9 @@ class Oligarch:
         elif choice == "Start Crypto Ponzi Scheme (-200K RUB)":
             if self.money < 200_000:
                 print("You don't have enough money to start a crypto ponzi scheme.")
+                return
+            if self.inventory.get("Crypto Ponzi Scheme"):
+                print("You already have a crypto ponzi scheme.")
                 return
             self.inventory["Crypto Ponzi Scheme"] = True
             print("You started a crypto ponzi scheme. (-200K RUB, +10 Reputation, +2K RUB/day)")
@@ -91,11 +97,11 @@ class Oligarch:
                 print("You don't have enough money or you already own a football club.")
                 return
             if self.power + self.reputation < 100:
-                print("Your 'peers' mock your feeble bid for a club. (-500k RUB, -50 Reputation)")
-                self.reputation -= 50
+                print("Your 'peers' mock your feeble bid for a club. (-500k RUB, -40 Reputation)")
+                self.reputation -= 40
                 self.money -= 500_000
             else:
-                print("You bought a football club, potentially generating passive income. (-10M RUB, +15K RUB/day, +20 Reputation)")
+                print("You bought a football club, generating passive income. (-10M RUB, +15K RUB/day, +20 Reputation)")
                 self.money -= 10_000_000
                 self.passive_income += 5_000
                 self.inventory["Football Club"] = True
@@ -115,7 +121,7 @@ class Oligarch:
 
         elif choice == "Fix Matches":
             if self.power < 50:
-                print("You get caught fixing matches. (-100K RUB, -20 Reputation)")
+                print("You get caught fixing matches. Bastard. (-100K RUB, -20 Reputation)")
                 self.money -= 100_000
                 self.reputation -= 20
                 self.football_fixes += 1
@@ -127,6 +133,7 @@ class Oligarch:
   
 
         elif choice == "Pump & Dump Crypto":
+            del self.inventory["Crypto Ponzi Scheme"]
             if self.reputation + self.power > 100:
                 print("You executed a pump & dump scheme. (+300K RUB, +10 Reputation)")
                 self.money += 300_000
@@ -136,7 +143,8 @@ class Oligarch:
                 self.money -= 100_000
                 self.reputation -= 20
                 if self.role == "Tech Baron":
-                    print("But you are a Tech Baron, so you just call it a memecoin and the rubes eat it up! (+300K RUB, +10 Reputation)")
+                    time.sleep(1)
+                    print("But you are a Tech Baron, so you just call it a memecoin and the rubes eat it up! (+300K RUB, +30 Reputation)")
                     self.money += 400_000  
                     self.reputation += 30
 
@@ -256,7 +264,7 @@ class Oligarch:
         if self.money >= 50_000_000:
             print("You retire to a private island with billions in offshore accounts. Congratulations!")
             self.alive = False
-        elif self.reputation >= 100:
+        elif self.reputation >= 100 & self.power >= 80 & self.rivals <= 1:
             print("You ascend to political power and become president for life!")
             self.alive = False
         elif self.health <= 0:
