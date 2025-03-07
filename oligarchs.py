@@ -255,7 +255,7 @@ class Oligarch:
                     del self.inventory[seized]
                     self.passive_income -= 100_000
         if random.randint(1, 100) <= self.jail_chance:
-            print("You have been sent to jail. All assets have been seized.")
+            print("Government crackdown! You have been sent to jail and all assets seized.")
             self.inventory = {}
             self.money = 100_000
             self.passive_income = 0
