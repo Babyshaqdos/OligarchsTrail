@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import Label, Button, StringVar, Entry, Radiobutton, Frame
+from tkinter import Label, Button, StringVar, Entry, Radiobutton, Frame, messagebox
 from PIL import Image, ImageTk
 import random
 
@@ -7,22 +7,43 @@ import random
 
 
 
+
 def bribe_condition(player):
     """Bribe success chance based on player power and reputation."""
-    if player.power >= 80 and player.reputation >= 70:
+    if (player.power >= 80 and player.reputation >= 70) or random.randint(0, 100) < (player.power + player.reputation) / 2:
         return True
     return False
 
-
-
-
-
+#Define some milestones in the game
 MILESTONES = {
-    1: "empire_crumbles.png",  # Example milestone at day 10 (for example purposes)
-    4: "voucher_wars.png",     # Another milestone at day 50
-    10: "business_or_bullet.png",      # Mid 1990s
-    12: "ruble_meltdown.png",          # 2000s
-    14: "new_rules_new_risks.png",    # Current day
+    1: {
+        "image": "empire_crumbles.png",
+        "description": "🛑🛑🛑 1991: The Soviet Union officially dissolves. Power vacuums emerge across the region. The rules are gone — but so are the guards.🛑🛑🛑"
+    },
+    4: {
+        "image": "voucher_wars.png",
+        "description": "1993: Voucher privatization begins. Those with inside knowledge become overnight millionaires, others are left in the dust."
+    },
+    10: {
+        "image": "business_or_bullet.png",
+        "description": "1996: It’s a free-for-all. Oligarchs rule through both boardrooms and bullets. The price of ambition is blood."
+    },
+    14: {
+        "image": "ruble_meltdown.png",
+        "description": "📉 1998: The Ruble crashes. Chaos engulfs the financial sector. Those who hedged offshore survive — barely.📉"
+    },
+    20: {
+        "image": "new_rules_new_risks.png",
+        "description": "2000: A new power structure solidifies. The rules are different now, and survival demands allegiance or exile."
+    },
+    30: {
+        "image": "dangerous_story.png",
+        "description": "2001: The start of Comrade Putins regime is marked with crackdowns on media, businesses, and political rivals. It is a dangerous time to be an oligarch"
+    },
+    40: {
+        "image": "end_of_beginning.png",
+        "description": "2004: Putin has won his second election in a landslide under dubious circumstances. Is Russian democracy lost forever?"
+    },
 }
 
 
@@ -36,6 +57,11 @@ class Player:
         self.day = 0
         self.event_chance = 0.01  # Daily chance of a random event
         self.alive = True
+        self.offshore_investments = 0
+        self.shell_companies = 0
+        self.bribed_officials = 0
+        self.journalists_disappeared = 0
+        self.businesses = 0
 
     def set_starting_stats(self):
         roles = {
@@ -52,6 +78,20 @@ class Player:
         self.reputation = max(0, min(100, self.reputation + event.reputation_change))
         self.health = max(0, min(100, self.health + event.health_change))
         self.power = max(0, min(100, self.power + event.power_change))
+
+        if event.name == "Offshore Investment":
+            self.offshore_investments += 1
+        elif event.name == "Invest in Shell Company":
+            self.shell_companies += 1
+        elif event.name == "Bribe Government Official":
+            self.bribed_officials += 1
+        elif event.name == "Disappear a Journalist":
+            self.journalists_disappeared += 1
+        elif event.name == "Start Business Venture":
+            self.businesses += 1
+
+
+
 
         # Check for health-based death
         if self.health <= 0:
@@ -93,35 +133,148 @@ class GameEvent:
         self.outcomes = outcomes  # Optional list of possible outcomes (dicts)
 
     def apply_random_outcome(self, player):
-        if self.outcomes:
-            outcome = random.choice(self.outcomes)
-            player.money += outcome.get('money_change', 0)
-            player.reputation += outcome.get('reputation_change', 0)
-            player.health += outcome.get('health_change', 0)
-            player.power += outcome.get('power_change', 0)
+        # Custom logic for Offshore Windfall based on prior offshore investments
+        if self.name == "Offshore Windfall" and player.offshore_investments > 0:
+            outcomes = []
 
-            # Clamp stats
+            # Weighted positive outcomes
+            outcomes += [{"money_change": +500_000, "description": "A forgotten Swiss bond finally cleared."}] * 4
+            outcomes += [{"money_change": +1_000_000, "description": "An old Cayman account matured. Jackpot!"}] * 3
+            outcomes += [{"money_change": +2_000_000, "description": "Shell company profits poured in unexpectedly."}] * max(1, player.offshore_investments // 2)
+
+            # Scaling chance of international crackdown
+            sanction_chance = min(0.05 + 0.02 * player.offshore_investments, 0.3)
+            if random.random() < sanction_chance:
+                outcomes.append({
+                    "money_change": -250_000,
+                    "reputation_change": -10,
+                    "description": "💥 International authorities froze one of your offshore accounts!"
+                })
+            outcome = random.choice(outcomes)        
+        elif self.name == "Stock Market Crash":
+            loss_per_shell = 200_000
+            loss_per_business = 300_00
+            total_loss = player.shell_companies * loss_per_shell + player.businesses * loss_per_business
+            player.money -= total_loss
+            player.reputation -= 5  # static rep loss
             player.reputation = max(0, min(100, player.reputation))
-            player.health = max(0, min(100, player.health))
-            player.power = max(0, min(100, player.power))
 
-            return outcome.get('description', "")
+            return f"📉 The market crashed, and your {player.shell_companies} shell companies and {player.businesses} businesses cost you {total_loss // 1000:,}K RUB!"
+        elif self.name == "Government Crackdown":
+            shell_count = player.shell_companies
+            business_count = player.businesses
+            bribes = player.bribed_officials
+            silenced_press = player.journalists_disappeared
+            role = player.role
+
+            kgb_bonus = 0.1 if "KGB Agent" in role else 0.0
+            risk_threshold = random.randint(0, 10)
+
+            if bribes >= risk_threshold:
+                return (
+                    f"🛡️ Your {bribes} bribed officials deflected government scrutiny.\n"
+                    f"No investigation was launched despite your {shell_count} shell companies and {business_count} businesses."
+                )
+
+            # Apply penalties
+            base_fine = 1_000_000
+            base_rep_loss = 10
+            base_health_loss = 20
+
+            if bribes > 0 or silenced_press > 0 or "KGB Agent" in role:
+                mitigation_factor = 0.1 * bribes + 0.05 * silenced_press + kgb_bonus
+                mitigation_factor = min(mitigation_factor, 0.9)
+
+                fine = int(base_fine * (1 - mitigation_factor))
+                rep_loss = int(base_rep_loss * (1 - mitigation_factor))
+                health_loss = int(base_health_loss * (1 - mitigation_factor))
+
+                player.money -= fine
+                player.reputation -= rep_loss
+                player.health -= health_loss
+
+                player.reputation = max(0, min(100, player.reputation))
+                player.health = max(0, min(100, player.health))
+
+                role_note = " (KGB bonus included)" if kgb_bonus > 0 else ""
+                desc = (
+                    f"⚖️ A crackdown hit your {shell_count} shell companies and {business_count} businesses.\n"
+                    f"Thanks to partial protection ({bribes} officials, {silenced_press} journalists){role_note}, "
+                    f"you only lost {fine // 1000}K RUB, {rep_loss} reputation, and {health_loss} health."
+                )
+            else:
+                player.money -= base_fine
+                player.reputation -= base_rep_loss
+                player.health -= base_health_loss
+
+                player.reputation = max(0, min(100, player.reputation))
+                player.health = max(0, min(100, player.health))
+
+                desc = (
+                    f"🚨 Your {shell_count} shell companies and {business_count} businesses were audited.\n"
+                    f"You lost {base_fine // 1000}K RUB, {base_rep_loss} reputation, and {base_health_loss} health."
+                )
+
+            # -- Business Seizure Risk --
+            if business_count > 0:
+                base_business_risk = 0.2 + 0.05 * business_count
+                mitigation = 0.03 * bribes + 0.01 * silenced_press
+                effective_risk = max(0, min(1, base_business_risk - mitigation))
+
+                if random.random() < effective_risk:
+                    seized = random.randint(1, min(2, business_count))
+                    player.businesses -= seized
+                    desc += f"\n🏢 The government also seized {seized} of your businesses!"
+
+            return desc
         else:
-            # Apply default values and clamp
-            player.money += self.money_change
-            player.reputation = max(0, min(100, player.reputation + self.reputation_change))
-            player.health = max(0, min(100, player.health + self.health_change))
-            player.power = max(0, min(100, player.power + self.power_change))
-            return self.description
+            # Use standard outcomes if available
+            if self.outcomes:
+                outcome = random.choice(self.outcomes)
+            else:
+                player.money += self.money_change
+                player.reputation = max(0, min(100, player.reputation + self.reputation_change))
+                player.health = max(0, min(100, player.health + self.health_change))
+                player.power = max(0, min(100, player.power + self.power_change))
+                return self.description
+
+        # Apply chosen outcome (for Offshore Windfall or standard events)
+        player.money += outcome.get('money_change', 0)
+        player.reputation = max(0, min(100, player.reputation + outcome.get('reputation_change', 0)))
+        player.health = max(0, min(100, player.health + outcome.get('health_change', 0)))
+        player.power = max(0, min(100, player.power + outcome.get('power_change', 0)))
+
+        desc = outcome.get('description', "")
+        money = outcome.get('money_change', 0)
+        rep = outcome.get('reputation_change', 0)
+        health = outcome.get('health_change', 0)
+        power = outcome.get('power_change', 0)
+
+        effect_summary = ""
+        if any([money, rep, health, power]):
+            effect_summary = "\n\n📊 Effects:\n"
+            if money:
+                effect_summary += f"💰 Money: {money:+,}\n"
+            if rep:
+                effect_summary += f"⭐ Reputation: {rep:+}\n"
+            if health:
+                effect_summary += f"❤️ Health: {health:+}\n"
+            if power:
+                effect_summary += f"⚡ Power: {power:+}\n"
+
+        return desc + effect_summary
+
+
 
 RANDOM_EVENTS = [
     GameEvent(
         "Stock Market Crash",
         description="The stock market is in free fall.",
         outcomes=[
-            {"money_change": -1_000_000, "reputation_change": -5, "description": "You lost a fortune in speculative investments."},
-            {"money_change": -500_000, "reputation_change": -2, "description": "You pulled out just in time but still took a hit."},
-            {"money_change": 0, "reputation_change": +3, "description": "You shorted the market and emerged smarter than ever."}
+            {"money_change": -2_000_000, "reputation_change": -15, "description": "You lost a fortune in speculative investments."},
+            {"money_change": -500_000, "reputation_change": -5, "description": "You pulled out just in time but still took a hit."},
+            {"money_change": +1_000_000, "reputation_change": +5, "description": "You shorted the market and emerged smarter than ever."},
+            {"money_change": +10_000_000, "reputation_change": +15, "description": "You crashed the market and ruined your rivals who are none the wiser. You buy up their assets at fire sale prices."}
         ]
     ),
     GameEvent(
@@ -137,7 +290,7 @@ RANDOM_EVENTS = [
         "Government Crackdown",
         description="The state is flexing its muscle again.",
         outcomes=[
-            {"money_change": -1_000_000, "reputation_change": -10, "health_change": -20, "description": "A full investigation and asset freeze struck hard."},
+            {"money_change": -2_000_000, "reputation_change": -10, "health_change": -20, "description": "A full investigation and asset freeze struck hard."},
             {"money_change": -500_000, "reputation_change": -5, "health_change": -10, "description": "Some light arrests and fines kept you in line."},
             {"money_change": -100_000, "reputation_change": 0, "health_change": 0, "description": "A warning shot—just enough to rattle you."}
         ]
@@ -165,6 +318,8 @@ RANDOM_EVENTS = [
         "Assassination Attempt",
         description="Someone wants you dead.",
         outcomes=[
+            {"health_change": -100, "description": "The penthouse balcony has such a beautiful view looking out over the city, but its hard to admire it with the ground rushing up on you"},
+            {"health_change": -90, "description": "That last batch of tea sure tasted rather funny"},
             {"health_change": -50, "description": "A car bomb missed its mark—but you were injured."},
             {"health_change": -25, "description": "A sniper attempt left you shaken and bruised."},
             {"health_change": 0, "description": "You escaped unharmed. Too close for comfort."}
@@ -172,11 +327,13 @@ RANDOM_EVENTS = [
     ),
     GameEvent(
         "Offshore Windfall",
+        condition=lambda player: player.offshore_investments > 0,
         description="A foreign account lights up unexpectedly.",
         outcomes=[
-            {"money_change": +1_000_000, "description": "An old Cayman account matured. Jackpot!"},
             {"money_change": +500_000, "description": "A forgotten Swiss bond finally cleared."},
-            {"money_change": +2_000_000, "description": "Shell company profits poured in unexpectedly."}
+            {"money_change": +1_000_000, "description": "An old Cayman account matured. Jackpot!"},
+            {"money_change": +2_000_000, "description": "Shell company profits poured in unexpectedly."},
+            {"money_change": -250_000, "reputation_change": -10, "description": "💥 International authorities froze one of your accounts!"},
         ]
     )
 ]
@@ -188,8 +345,22 @@ class GameGUI:
     def __init__(self, root):
         self.root = root
         self.player = None
-        self.root.geometry("800x600")
-        self.root.eval('tk::PlaceWindow . center')
+        #self.root.geometry("1200x800")
+        # Get the screen width and height
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Set the window geometry to fill the screen
+        self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+
+        # Optional: Maximize the window state (Windows only)
+        try:
+            self.root.state('zoomed')  # Windows-specific
+        except:
+            self.root.attributes('-zoomed', True)  # Fallback for other OS
+
+
+        #self.root.eval('tk::PlaceWindow . center')
         self.show_welcome_screen()
 
     def start_game(self):
@@ -242,21 +413,39 @@ class GameGUI:
     
     def trigger_event(self, event: GameEvent):
         message = event.apply_random_outcome(self.player)
-        full_message = f"Event: {event.name}\n\n{message}"
-        self.update_game_text(full_message)
+        full_message = (
+            "🔮 [Random Event Triggered] 🔮\n"
+            f"🌀 {event.name} 🌀\n\n"
+            f"{message}"
+        )
+        self.update_game_text(full_message, tag= "random_event")
         self.update_stats_display()
+
 
     
     def advance_day(self):
         self.player.day += 1
         self.player.event_chance += 0.01  # Increase the chance slightly every day
+        daily_income = 100_000 * self.player.businesses
+        if self.player.businesses > 0:
+            self.player.money += daily_income
+            self.update_game_text(f"💼 Your {self.player.businesses} business(es) generated {self.format_money(daily_income)} today.", tag="player_event")
+
         self.check_for_random_event()
-        # Check if a milestone has been reached
         if self.player.day in MILESTONES:
-            self.root.unbind("<Configure>")
-            self.update_image_for_milestone(MILESTONES[self.player.day])
+            milestone = MILESTONES[self.player.day]
+            self.update_image_for_milestone(milestone["image"])
+            milestone_text = (
+                f"🏁 [Milestone Reached] 🏁\n"
+                f"{milestone['description']}"
+            )
+            self.update_game_text(milestone_text, tag="milestone")
+
+        if self.player.day == 12:  # Ruble crash
+            self.player.money = int(self.player.money * 0.5)  # 50% devaluation
+            self.update_game_text("💥 The Ruble crash cut your holdings in half!")
         self.check_win_condition()
-        self.check_game_over() 
+        #self.check_game_over() 
 
     def stat_weighted_success(self, relevant_stats, difficulty=50):
         """
@@ -273,12 +462,23 @@ class GameGUI:
         return roll < success_chance
     
     def check_game_over(self):
-        if not self.player.alive:
-            if self.player.health <= 0:
-                self.update_game_text("💀 You have died. The ruthless climb to power has claimed your life.")
-            elif self.player.money < 0:
-                self.update_game_text("📉 You’ve gone bankrupt. The wolves have come to collect, and there's nothing left to give.")
+        #Manual check for money <= 0
+        if self.player.money <= 0:
+            self.player.alive = False
+            reason = "📉 You’ve gone bankrupt. The wolves have come to collect, and there's nothing left to give."
+            self.update_game_text(reason)
+            self.root.after(100, lambda: messagebox.showinfo("Game Over", reason))
             self.disable_game_inputs()
+            return
+        # Original health death check
+        if self.player.health <= 0:
+            self.player.alive = False
+            reason = "💀 You have died. The ruthless climb to power has claimed your life."
+            self.update_game_text(reason)
+            self.root.after(100, lambda: messagebox.showinfo("Game Over", reason))
+            self.disable_game_inputs()
+
+
 
 
     def update_image_for_milestone(self, image_file):
@@ -369,6 +569,11 @@ class GameGUI:
 
         self.text_box = tk.Text(self.text_frame, wrap="word", height=2, bg="white", font=("Arial", 10))
         self.text_box.pack(side="left", fill="both", expand=True)
+        self.text_box.tag_config("random_event", foreground="dark red", font=("Arial", 10, "bold"))
+        self.text_box.tag_config("player_event", foreground="dark blue", font=("Arial", 10))
+        self.text_box.tag_config("milestone", foreground="dark green", font=("Arial", 12, "bold"))
+
+
 
         self.text_scroll = tk.Scrollbar(self.text_frame, command=self.text_box.yview)
         self.text_scroll.pack(side="right", fill="y")
@@ -426,10 +631,14 @@ class GameGUI:
         Label(self.stats_panel, text=f"Health: {self.player.health}").pack()
         Label(self.stats_panel, text=f"Power: {self.player.power}").pack()
 
-    def update_game_text(self, new_message):
-        """Append a new message to the text box and auto-scroll to the bottom."""
-        self.text_box.insert("end", new_message + "\n\n")  #Add the new message
-        self.text_box.yview_moveto(1.0)  #Auto-scroll to the latest message
+    def update_game_text(self, new_message, tag=None):
+        """Append a new message to the text box with optional styling tag."""
+        if tag:
+            self.text_box.insert("end", new_message + "\n\n", tag)
+        else:
+            self.text_box.insert("end", new_message + "\n\n")
+        self.text_box.yview_moveto(1.0)
+
 
     
     def options_menu(self):
@@ -442,7 +651,9 @@ class GameGUI:
             ("Blackmail Rival", -100000, 15, 0, 5),
             ("Luxury Spa Visit", -50000, 0, 10, 0),
             ("Bribe Doctor", -100000, 0, 20, 0),
-            ("Offshore Investment", 0, 0, 0, 0)
+            ("Offshore Investment", -1000000, 0, 0, 0),
+            ("Buy Lottery Ticket", "lottery"),
+            ("Start Business Venture", -500_000, 0, 0, 0)
         ]
         
         rows = 2
@@ -450,6 +661,14 @@ class GameGUI:
         for index, option in enumerate(options):
             row = index // cols
             col = index % cols
+
+            if isinstance(option[1], str) and option[1] == "lottery":
+                btn = Button(self.options_panel, text=option[0],
+                            command=self.confirm_lottery)
+                btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
+                continue
+
+
             event_name, money_change, reputation_change, health_change, power_change = option
 
             event_data = GameEvent(event_name, money_change, reputation_change, health_change, power_change, "")
@@ -465,23 +684,82 @@ class GameGUI:
 
             btn.grid(row=row, column=col, padx=5, pady=5, sticky="ew")
 
+
+    def confirm_lottery(self):
+        if self.player.money <= 0:
+            messagebox.showinfo("Not Enough Money", "You have no money to buy lottery tickets.")
+            return
+
+        confirm = messagebox.askyesno("Confirm Lottery",
+            f"Are you sure you want to spend ALL {self.format_money(self.player.money)} on lottery tickets?")
+        
+        if confirm:
+            self.run_lottery()
+
+    def run_lottery(self):
+        # Take all money
+        spent = self.player.money
+        self.player.money = 0
+
+        # 1 ticket per 1,000 RUB
+        tickets = spent // 1_000
+        if tickets == 0:
+            self.update_game_text("You didn’t have enough for even a single lottery ticket.")
+            self.advance_day()
+            self.check_game_over()
+            self.options_menu()
+            return
+        
+        if random.random() < 0.1 or random.random() < self.player.power + random.randint(0, 10) / 100: #1% base chance modified by power
+            self.update_game_text("💸 You bought lottery tickets... and won nothing.")
+            self.advance_day()
+            self.check_game_over()
+            self.options_menu()
+            return
+
+
+        # Calculate max multiplier scaling with amount spent (2x to 5x)
+        max_bonus_cap = 3_000_000
+        scale = min(spent / max_bonus_cap, 1.0)  # 0 to 1
+        max_multiplier = 2 + 3 * scale
+
+        # Roll for multiplier
+        win_multiplier = round(random.uniform(0.5, max_multiplier), 2)
+
+        # Calculate payout
+        payout = int(spent * win_multiplier)
+
+        # Update player stats
+        self.player.money += payout
+        self.update_stats_display()
+
+        result = (
+            f"🎟️ You bought {tickets:,} lottery tickets and spent all your money.\n\n"
+            f"🎉 Your win multiplier was {win_multiplier:.2f}x!\n"
+            f"You won {self.format_money(payout)}!"
+        )
+
+        self.update_game_text(result, tag="player_event")
+        self.advance_day()
+        self.check_game_over()
+        self.options_menu()
+
+
     def apply_option(self, event):
-        if event:  #Check if the event is valid
-            #Apply the event to the player's stats
+        if event:
             self.player.apply_event(event)
-                
-                #Update the stats display
             self.update_stats_display()
-            #Update the message label with event description
             message = f"You chose to {event.name}.\n\nEffects: " \
                     f"Money {event.money_change:+}, " \
                     f"Reputation {event.reputation_change:+}, " \
                     f"Health {event.health_change:+}, " \
                     f"Power {event.power_change:+}\n\n{event.description}"
+            self.update_game_text(message, tag="player_event")
+            self.advance_day()
+            self.check_game_over()
+            self.options_menu()
 
-            self.update_game_text(message)  #Append message to text box
-            self.advance_day()  #Advance to the next day
-            self.options_menu() 
+
 
     def check_win_condition(self):
         if self.player.day >= 50:
